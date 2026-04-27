@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>آلة حاسبة كاملة | قابلة للطباعة</title>
+    <style>
+        /* التنسيقات العامة */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .calculator {
+            background-color: #222;
+            border-radius: 20px;
+            box-shadow: 0 20px 30px rgba(0, 0, 0, 0.5);
+            width: 100%;
+            max-width: 400px;
+            padding: 25px;
+            transition: all 0.3s ease;
+        }
+
+        /* شاشة العرض */
+        .display {
+            background-color: #333;
+            color: #0f0;
+            font-size: 2.5rem;
+            font-weight: bold;
+            text-align: right;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+            direction: ltr; /* للأرقام من اليسار لليمين */
+            overflow-x: auto;
+            white-space: nowrap;
+            border: 2px solid #555;
+        }
+
+        /* شبكة الأزرار */
+        .buttons {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+
+        /* تصميم الأزرار المشترك */
+        button {
+            background-color: #444;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.8rem;
+            font-weight: bold;
+            padding: 20px 5px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 5px 0 #1a1a1a;
+            font-family: inherit;
+        }
+
+        button:active {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 #1a1a1a;
+        }
+
+        /* أزرار العمليات */
+        .operator {
+            background-color: #ff9500;
+            box-shadow: 0 5px 0 #b36b00;
+        }
+
+        .operator:hover {
+            background-color: #ffad33;
+        }
+
+        /* زر المسح */
+        .clear {
+            background-color: #f44336;
+            box-shadow: 0 5px 0 #b32d2d;
+            grid-column: span 2; /* يأخذ عمودين */
+        }
+
+        .clear:hover {
+            background-color: #ff6659;
+        }
+
+        /* زر المساواة */
+        .equals {
+            background-color: #4caf50;
+            box-shadow: 0 5px 0 #357a38;
+            grid-column: span 2; /* يأخذ عمودين */
+        }
+
+        .equals:hover {
+            background-color: #66bb6a;
+        }
+
+        /* زر الصفر */
+        .zero {
+            grid-column: span 2;
+        }
+
+        /* تنسيق خاص للطباعة */
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            .calculator {
+                box-shadow: none;
+                background: white;
+                border: 2px solid #000;
+                max-width: 100%;
+            }
+            .display {
+                background: white;
+                color: black;
+                border: 2px solid #000;
+                box-shadow: none;
+            }
+            button {
+                display: none; /* نخفي الأزرار عند الطباعة */
+            }
+            /* يمكن إظهار نتيجة ثابتة إذا أردت، لكن الأفضل إخفاء الأزرار */
+            .buttons {
+                display: none;
+            }
+        }
+
+        /* تنسيق إضافي للشاشات الصغيرة */
+        @media (max-width: 450px) {
+            .calculator {
+                padding: 15px;
+            }
+            button {
+                font-size: 1.5rem;
+                padding: 15px 5px;
+            }
+            .display {
+                font-size: 2rem;
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="calculator">
+        <!-- شاشة العرض -->
+        <div class="display" id="display">0</div>
+
+        <!-- الأزرار -->
+        <div class="buttons">
+            <!-- الصف الأول: مسح كلي، مسح جزء، موديولو، قسمة -->
+            <button class="clear" onclick="clearDisplay()">C</button>
+            <button class="operator" onclick="appendOperator('/')">÷</button>
+
+            <!-- الصف الثاني: 7 8 9 * -->
+            <button onclick="appendNumber('7')">7</button>
+            <button onclick="appendNumber('8')">8</button>
+            <button onclick="appendNumber('9')">9</button>
+            <button class="operator" onclick="appendOperator('*')">×</button>
+
+            <!-- الصف الثالث: 4 5 6 - -->
+            <button onclick="appendNumber('4')">4</button>
+            <button onclick="appendNumber('5')">5</button>
+            <button onclick="appendNumber('6')">6</button>
+            <button class="operator" onclick="appendOperator('-')">−</button>
+
+            <!-- الصف الرابع: 1 2 3 + -->
+            <button onclick="appendNumber('1')">1</button>
+            <button onclick="appendNumber('2')">2</button>
+            <button onclick="appendNumber('3')">3</button>
+            <button class="operator" onclick="appendOperator('+')">+</button>
+
+            <!-- الصف الخامس: 0 . مساواة (زر المساواة يمتد عمودين) -->
+            <button class="zero" onclick="appendNumber('0')">0</button>
+            <button onclick="appendDot()">.</button>
+            <button class="equals" onclick="calculate()">=</button>
+        </div>
+    </div>
+
+    <script>
+        // متغير لتخزين قيمة الشاشة
+        let displayValue = '0';
+        let pendingValue = null;
+        let pendingOperator = null;
+        let shouldResetDisplay = false;
+
+        const displayElement = document.getElementById('display');
+
+        // تحديث الشاشة
+        function updateDisplay() {
+            displayElement.textContent = displayValue;
+        }
+
+        // إضافة رقم
+        function appendNumber(number) {
+            if (displayValue === '0' || shouldResetDisplay) {
+                displayValue = number;
+                shouldResetDisplay = false;
+            } else {
+                displayValue += number;
+            }
+            updateDisplay();
+        }
+
+        // إضافة نقطة عشرية
+        function appendDot() {
+            if (shouldResetDisplay) {
+                displayValue = '0.';
+                shouldResetDisplay = false;
+                updateDisplay();
+                return;
+            }
+            // إذا كانت القيمة الحالية لا تحتوي على نقطة
+            if (!displayValue.includes('.')) {
+                displayValue += '.';
+            }
+            updateDisplay();
+        }
+
+        // إضافة عامل
+        function appendOperator(operator) {
+            // إذا كان هناك عامل معلق، نقوم بالحساب أولاً
+            if (pendingOperator !== null && !shouldResetDisplay) {
+                calculate();
+            }
+            pendingValue = parseFloat(displayValue);
+            pendingOperator = operator;
+            shouldResetDisplay = true;
+        }
+
+        // تنفيذ العملية الحسابية
+        function calculate() {
+            if (pendingOperator === null || pendingValue === null) {
+                return;
+            }
+
+            let currentValue = parseFloat(displayValue);
+            let result;
+
+            switch (pendingOperator) {
+                case '+':
+                    result = pendingValue + currentValue;
+                    break;
+                case '-':
+                    result = pendingValue - currentValue;
+                    break;
+                case '*':
+                    result = pendingValue * currentValue;
+                    break;
+                case '/':
+                    if (currentValue === 0) {
+                        alert('لا يمكن القسمة على صفر');
+                        clearDisplay();
+                        return;
+                    }
+                    result = pendingValue / currentValue;
+                    break;
+                default:
+                    return;
+            }
+
+            // تقليل الأخطاء العشرية
+            result = Math.round(result * 100000000) / 100000000;
+
+            displayValue = result.toString();
+            pendingOperator = null;
+            pendingValue = null;
+            shouldResetDisplay = true;
+            updateDisplay();
+        }
+
+        // مسح الشاشة
+        function clearDisplay() {
+            displayValue = '0';
+            pendingValue = null;
+            pendingOperator = null;
+            shouldResetDisplay = false;
+            updateDisplay();
+        }
+
+        // تهيئة أولية
+        updateDisplay();
+    </script>
+</body>
+</html>
