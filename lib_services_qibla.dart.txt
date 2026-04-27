@@ -1,0 +1,15 @@
+import 'dart:math';
+
+// حساب اتجاه القبلة (bearing من الشمال) إلى الكعبة (21.422487, 39.826206)
+double calculateQiblaBearing(double lat, double lon) {
+  const double kaabaLat = 21.422487 * (pi / 180.0);
+  const double kaabaLon = 39.826206 * (pi / 180.0);
+  double phi = lat * (pi / 180.0);
+  double lambda = lon * (pi / 180.0);
+
+  double y = sin(kaabaLon - lambda) * cos(kaabaLat);
+  double x = cos(phi) * sin(kaabaLat) - sin(phi) * cos(kaabaLat) * cos(kaabaLon - lambda);
+  double bearing = atan2(y, x);
+  bearing = (bearing * 180.0 / pi + 360) % 360; // درجة من الشمال
+  return bearing;
+}

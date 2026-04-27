@@ -1,0 +1,122 @@
+import 'dart:math';
+
+class PrayTimes {
+  // مبسّط: طريقة حساب Angle based method مع زاوية الفجر/العشاء الافتراضية.
+  // القيم يمكن تعديلها أو إضافة خيارات طرق حساب.
+  final double fajrAngle = 18.0;
+  final double ishaAngle = 17.0;
+
+  Map<String, DateTime> getTimesForDate(DateTime date, double lat, double lon, double timezone) {
+    // تحويل التاريخ إلى يوم جوليا تقريبي
+    double jd = _julianDate(date.year, date.month, date.day) - lon / (15.0 * 24.0);
+    double d = jd - 2451545.0;
+
+    // حساب شروق/غروب تقريبي
+    double timesNoon = _sunTransit(d, lon);
+    double dhuhr = timesNoon;
+
+    double fajr = _sunAngleTime(d, lat, lon, fajrAngle, true);
+    double sunrise = _sunAngleTime(d, lat, lon, 0.833, true);
+    double asr = _asrTime(d, lat, lon, 1); // standard shadowFactor = 1 for Asr
+    double maghrib = _sunAngleTime(d, lat, lon, 0.833, false);
+    double isha = _sunAngleTime(d, lat, lon, ishaAngle, false);
+
+    // تحويل إلى DateTime مع timezone (ساعات)
+    DateTime base = DateTime(date.year, date.month, date.day);
+    Map<String, DateTime> out = {
+      'fajr': _timeFromFraction(base, fajr + timezone),
+      'sunrise': _timeFromFraction(base, sunrise + timezone),
+      'dhuhr': _timeFromFraction(base, dhuhr + timezone),
+      'asr': _timeFromFraction(base, asr + timezone),
+      'maghrib': _timeFromFraction(base, maghrib + timezone),
+      'isha': _timeFromFraction(base, isha + timezone),
+    };
+    return out;
+  }
+
+  double _julianDate(int year, int month, int day) {
+    int a = ((14 - month) / 12).floor();
+    int y = year + 4800 - a;
+    int m = month + 12 * a - 3;
+    double jd = day + ((153 * m + 2) / 5).floor() + 365 * y + (y / 4).floor() - (y / 100).floor() + (y / 400).floor() - 32045;
+    return jd.toDouble();
+  }
+
+  double _sunPosition(double d) {
+    // returns [declination, equationOfTime] (in radians and hours)
+    double D = d;
+    double g = _toRad((357.529 + 0.98560028 * D) % 360);
+    double q = _toRad((280.459 + 0.98564736 * D) % 360);
+    double L = q + _toRad((1.915 * sin(g) + 0.020 * sin(2 * g)));
+    double e = _toRad(23.439 - 0.00000036 * D);
+    double RA = atan2(cos(e) * sin(L), cos(L)) / _pi2();
+    double decl = asin(sin(e) * sin(L));
+    double eqt = (q / _pi2()) - RA;
+    return decl * 1e6 + eqt; // hacky pack: decl * 1e6 + eqt (we'll unpack)
+  }
+
+  double _sunDeclination(double d) {
+    double D = d;
+    double g = _toRad((357.529 + 0.98560028 * D) % 360);
+    double q = _toRad((280.459 + 0.98564736 * D) % 360);
+    double L = q + _toRad((1.915 * sin(g) + 0.020 * sin(2 * g)));
+    double e = _toRad(23.439 - 0.00000036 * D);
+    double decl = asin(sin(e) * sin(L));
+    return decl;
+  }
+
+  double _equationOfTime(double d) {
+    double D = d;
+    double g = _toRad((357.529 + 0.98560028 * D) % 360);
+    double q = _toRad((280.459 + 0.98564736 * D) % 360);
+    double L = q + _toRad((1.915 * sin(g) + 0.020 * sin(2 * g)));
+    double e = _toRad(23.439 - 0.00000036 * D);
+    double RA = atan2(cos(e) * sin(L), cos(L));
+    double eqt = (q - RA) / _toRad(15); // in hours
+    return eqt;
+  }
+
+  double _sunTransit(double d, double lon) {
+    // approximate solar noon in fractional hours UTC
+    double Jtransit = d + 2451545.0;
+    double eqt = _equationOfTime(d);
+    double noon = (12.0 - eqt - lon / 15.0);
+    return noon;
+  }
+
+  double _sunAngleTime(double d, double lat, double lon, double angle, bool isMorning) {
+    // returns time in fractional hours UTC
+    double decl = _sunDeclination(d);
+    double angleRad = _toRad(angle.abs());
+    double latRad = _toRad(lat);
+    double t = acos((sin(-angleRad) - sin(latRad) * sin(decl)) / (cos(latRad) * cos(decl)));
+    double hours = _toDeg(t) / 15.0;
+    double noon = _sunTransit(d, lon);
+    return isMorning ? (noon - hours) : (noon + hours);
+  }
+
+  double _asrTime(double d, double lat, double lon, int shadowFactor) {
+    double decl = _sunDeclination(d);
+    double latRad = _toRad(lat);
+    double angle = atan(1.0 / (shadowFactor + tan((latRad - decl).abs())));
+    // In practice we compute time when sun altitude = -angle
+    double t = acos((sin(-angle) - sin(latRad) * sin(decl)) / (cos(latRad) * cos(decl)));
+    double hours = _toDeg(t) / 15.0;
+    double noon = _sunTransit(d, lon);
+    return noon + hours;
+  }
+
+  DateTime _timeFromFraction(DateTime base, double fracHours) {
+    // fracHours may be >24 or negative; normalize
+    while (fracHours < 0) fracHours += 24;
+    fracHours = fracHours % 24;
+    int h = fracHours.floor();
+    int m = ((fracHours - h) * 60).round();
+    return DateTime(base.year, base.month, base.day, h, m);
+  }
+
+  // helpers
+  double _toRad(double deg) => deg * pi / 180.0;
+  double _toDeg(double rad) => rad * 180.0 / pi;
+  double _pi2() => pi * 2;
+}

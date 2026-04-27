@@ -1,0 +1,20 @@
+name: noor_islam
+description: Noor Islam — MVP Prayer Times & Qibla (Demo)
+publish_to: "none"
+version: 0.0.1
+
+environment:
+  sdk: ">=2.18.0 <3.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  geolocator: ^9.0.2
+  intl: ^0.18.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true

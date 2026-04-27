@@ -1,0 +1,171 @@
+name=lib/main.dart
+import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'services/pray_times.dart';
+import 'services/qibla.dart';
+import 'package:intl/intl.dart';
+
+void main() {
+  runApp(NoorApp());
+}
+
+class NoorApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'نور الإسلام',
+      theme: ThemeData(
+        primarySwatch: Colors.teal,
+        fontFamily: 'Tajawal', // يمكنك إضافة خطوط محلية لاحقًا
+      ),
+      home: HomeScreen(),
+      localizationsDelegates: [], // أضف التعريب إن رغبت
+      supportedLocales: [Locale('ar')],
+    );
+  }
+}
+
+class HomeScreen extends StatefulWidget {
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  String status = 'جاري الحصول على الموقع...';
+  Map<String, String>? times;
+  double? qiblaBearing;
+  Position? position;
+
+  @override
+  void initState() {
+    super.initState();
+    _initLocationAndCompute();
+  }
+
+  Future<void> _initLocationAndCompute() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        setState(() => status = 'خدمة الموقع غير متاحة. الرجاء تفعيلها.');
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          setState(() => status = 'تم رفض صلاحية الموقع.');
+          return;
+        }
+      }
+      if (permission == LocationPermission.deniedForever) {
+        setState(() => status = 'صلاحية الموقع مرفوضة نهائياً.');
+        return;
+      }
+
+      setState(() => status = 'جاري الحصول على الإحداثيات...');
+      Position pos = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.best);
+      setState(() => position = pos);
+
+      // احسب توقيت المنطقة
+      final now = DateTime.now();
+      final tzOffsetHours = now.timeZoneOffset.inHours;
+
+      // انشئ كائن الحساب واطلب الأوقات
+      final pray = PrayTimes();
+      final Map<String, DateTime> ptimes =
+          pray.getTimesForDate(now, pos.latitude, pos.longitude, tzOffsetHours.toDouble());
+
+      final formatter = DateFormat.Hm('ar');
+      Map<String, String> display = {
+        'الفجر': formatter.format(ptimes['fajr']!),
+        'الظهر': formatter.format(ptimes['dhuhr']!),
+        'العصر': formatter.format(ptimes['asr']!),
+        'المغرب': formatter.format(ptimes['maghrib']!),
+        'العشاء': formatter.format(ptimes['isha']!),
+      };
+
+      final qibla = calculateQiblaBearing(pos.latitude, pos.longitude);
+
+      setState(() {
+        times = display;
+        qiblaBearing = qibla;
+        status = 'جاهز';
+      });
+    } catch (e) {
+      setState(() => status = 'خطأ: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('نور الإسلام — مواقيت الصلاة'),
+        ),
+        body: Padding(
+          padding: EdgeInsets.all(16),
+          child: position == null
+              ? Center(child: Text(status))
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Card(
+                      child: Padding(
+                        padding: EdgeInsets.all(12),
+                        child: Column(
+                          children: [
+                            Text('إحداثياتك', style: TextStyle(fontWeight: FontWeight.bold)),
+                            SizedBox(height: 8),
+                            Text('خط العرض: ${position!.latitude.toStringAsFixed(6)}'),
+                            Text('خط الطول: ${position!.longitude.toStringAsFixed(6)}'),
+                          ],
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 12),
+                    Text('مواقيت اليوم', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    SizedBox(height: 8),
+                    if (times == null) Center(child: CircularProgressIndicator()) else
+                      Expanded(
+                        child: ListView(
+                          children: times!.entries.map((e) {
+                            return ListTile(
+                              title: Text(e.key, style: TextStyle(fontSize: 16)),
+                              trailing: Text(e.value, style: TextStyle(fontSize: 16)),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    SizedBox(height: 8),
+                    Card(
+                      child: Padding(
+                        padding: EdgeInsets.all(12),
+                        child: Column(
+                          children: [
+                            Text('اتجاه القبلة', style: TextStyle(fontWeight: FontWeight.bold)),
+                            SizedBox(height: 8),
+                            qiblaBearing == null
+                                ? Text('جارٍ الحساب...')
+                                : Text('${qiblaBearing!.toStringAsFixed(1)}° (نسبة إلى الشمال)'),
+                            SizedBox(height: 6),
+                            Icon(Icons.explore, size: 36, color: Colors.teal),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+        ),
+        floatingActionButton: FloatingActionButton(
+          child: Icon(Icons.refresh),
+          onPressed: _initLocationAndCompute,
+          tooltip: 'تحديث',
+        ),
+      ),
+    );
+  }
+}
